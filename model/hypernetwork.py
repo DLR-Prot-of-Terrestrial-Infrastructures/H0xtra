@@ -82,17 +82,17 @@ class LayerNorm(nn.Module):
     
 
 class DoubleConv(nn.Module):
-    def __init__(self, in_channels, d_embed, mid_channels=None, stride=2, padding=0):
+    def __init__(self, in_channels, d_embed, mid_channels=None, kernel_size=3, padding=1):
         super().__init__()
 
         if not mid_channels:
             mid_channels = d_embed
 
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_channels=in_channels, out_channels=mid_channels, kernel_size=kernel_size, padding=padding, bias=False),
             nn.BatchNorm2d(d_embed),
             nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, d_embed, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(mid_channels, d_embed, kernel_size=kernel_size, padding=padding, bias=False),
             nn.BatchNorm2d(d_embed),
             nn.ReLU(inplace=True)
         )
@@ -102,12 +102,12 @@ class DoubleConv(nn.Module):
     
 
 class Down(nn.Module):
-    def __init__(self, in_channels, d_embed):
+    def __init__(self, in_channels, d_embed, kernel_size, padding):
         super().__init__()
 
         self.conv_layer = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, d_embed))
+            DoubleConv(in_channels, d_embed, kernel_size=kernel_size, padding=padding))
 
     def forward(self, matrix):
         return self.conv_layer(matrix)
@@ -116,17 +116,16 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=False):
+    def __init__(self, in_channels, out_channels, kernel_size, padding, bilinear=False):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, kernel_size=kernel_size, padding=padding)
         else:
-            #self.up = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2)
             self.up = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, kernel_size=kernel_size, padding=padding)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
@@ -154,7 +153,7 @@ class OutConv(nn.Module):
     
 
 class UNet(nn.Module):
-    def __init__(self, n_layers, in_channels, d_embed, bilinear=False, coords='s'):
+    def __init__(self, n_layers, in_channels, d_embed, kernel_size, padding, bilinear=False, coords='s'):
         super(UNet, self).__init__()
         self.in_channels = in_channels
         self.d_embed = d_embed
@@ -171,15 +170,15 @@ class UNet(nn.Module):
             self.pe = PositionalEncoding2D(in_channels)
 
         self.encoder = nn.ModuleList()
-        self.encoder.append(DoubleConv(self.in_channels, self.d_embed))
+        self.encoder.append(DoubleConv(self.in_channels, self.d_embed, kernel_size=kernel_size, padding=padding))
         self.decoder = nn.ModuleList()
 
         self.out_layer = OutConv(d_embed, d_embed)
 
     
         for i in range(n_layers-1):
-            self.encoder.append(Down(d_embed, d_embed))
-            self.decoder.append(Up(d_embed, d_embed, self.bilinear))
+            self.encoder.append(Down(d_embed, d_embed, kernel_size, padding))
+            self.decoder.append(Up(d_embed, d_embed, kernel_size, padding, self.bilinear))
 
     def forward(self, matrix):
         buffer = []
@@ -254,7 +253,8 @@ class HyperNetworkConfig:
     n_layers: int = 4
     in_channels: int = 4
     d_embed: int = 32
-    kernel_size: int = 4
+    kernel_size: int = 3
+    padding: int = 1
     hypernetwork: str = 'unet'
     contr_loss: bool = True
     crop_by_day: bool = False
@@ -271,6 +271,8 @@ class HyperNetwork(nn.Module):
             self.block = UNet(n_layers=config.n_layers,
                               in_channels=config.in_channels,
                               d_embed=config.d_embed,
+                              kernel_size=config.kernel_size,
+                              padding=config.padding,
                               coords = config.coords)
         elif self.config.hypernetwork == 'cnn':
             self.block = BasicCNN(n_layers=config.n_layers,

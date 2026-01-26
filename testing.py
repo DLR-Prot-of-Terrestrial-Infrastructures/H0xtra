@@ -34,7 +34,7 @@ def test_H0xtra(cfg):
     # model init
     gpt_model_args = dict(n_layer=cfg.n_layer, n_head=cfg.n_head, n_embd=cfg.n_embd, block_size=cfg.block_size,
                     bias=cfg.bias, vocab_size=cfg.vocab_size, dropout=cfg.dropout, time_size=cfg.time_size) # start with model_args from command line
-    hyper_model_args = dict(n_layers=cfg.h_n_layers, in_channels=cfg.h_in_channels, d_embed=cfg.h_d_embed, kernel_size=cfg.h_kernel_size, hypernetwork=cfg.h_net, crop_by_day=cfg.crop_by_day, coords=cfg.h_coords)
+    hyper_model_args = dict(n_layers=cfg.h_n_layers, in_channels=cfg.h_in_channels, d_embed=cfg.h_d_embed, kernel_size=cfg.h_kernel_size, padding=cfg.h_padding, hypernetwork=cfg.h_net, crop_by_day=cfg.crop_by_day, coords=cfg.h_coords)
 
     gptconf = GPTConfig(**gpt_model_args)
     hyperconf = HyperNetworkConfig(**hyper_model_args)
@@ -125,7 +125,8 @@ if __name__ == "__main__":
     parser.add_argument('--h_n_layers', default=8, type=int, help='Number of layers in hypernetwork')
     parser.add_argument('--h_in_channels', default=85, type=int, help='Number of input channels for hypernetwork. Default choice equals number of POI categories')
     parser.add_argument('--h_d_embed', default=32, type=int, help='Output dimension of hypernetwork (i.e., the dimension of the location embeddings)')
-    parser.add_argument('--h_kernel_size', default=8, type=int, help='Kernel size in CNN hypernetwork')
+    parser.add_argument('--h_kernel_size', default=3, type=int, help='Kernel size in CNN hypernetwork')
+    parser.add_argument('--h_padding', default=1, type=int, help='Padding in CNN hypernetwork')
     parser.add_argument('--h_net', default='unet', type=str, choices=['unet', 'cnn', 'mlp'], help='Hypernetwork architecture')
     parser.add_argument('--h_coords', default='s', type=str, choices=['s', 'c', 'n'], help='Positional information for the hypernetwork. The "s" stands for sinusoidal positional encodings, "c" for integer coords, and "n" for no coords')
 
